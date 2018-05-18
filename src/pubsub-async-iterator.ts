@@ -31,6 +31,12 @@ import { PubSubEngine } from 'graphql-subscriptions/dist/pubsub-engine';
  * The PubSubEngine whose events will be observed.
  */
 export class PubSubAsyncIterator<T> implements AsyncIterator<T> {
+  private pullQueue: Function[];
+  private pushQueue: any[];
+  private eventsArray: string[];
+  private allSubscribed: Promise<number[]>;
+  private listening: boolean;
+  private pubsub: PubSubEngine;
 
   constructor(pubsub: PubSubEngine, eventNames: string | string[]) {
     this.pubsub = pubsub;
@@ -59,13 +65,6 @@ export class PubSubAsyncIterator<T> implements AsyncIterator<T> {
   public [$$asyncIterator]() {
     return this;
   }
-
-  private pullQueue: Function[];
-  private pushQueue: any[];
-  private eventsArray: string[];
-  private allSubscribed: Promise<number[]>;
-  private listening: boolean;
-  private pubsub: PubSubEngine;
 
   private async pushValue(event) {
     await this.allSubscribed;

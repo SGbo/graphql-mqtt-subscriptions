@@ -14,6 +14,16 @@ export interface PubSubMQTTOptions {
 }
 
 export class MQTTPubSub implements PubSubEngine {
+  private triggerTransform: TriggerTransform;
+  private onMQTTSubscribe: SubscribeHandler;
+  private subscribeOptionsResolver: SubscribeOptionsResolver;
+  private publishOptionsResolver: PublishOptionsResolver;
+  private mqttConnection: Client;
+
+  private subscriptionMap: { [subId: number]: [string, Function] };
+  private subsRefsMap: { [trigger: string]: Array<number> };
+  private currentSubscriptionId: number;
+  private parseMessageWithEncoding: string;
 
   constructor(options: PubSubMQTTOptions = {}) {
     this.triggerTransform = options.triggerTransform || (trigger => trigger as string);
@@ -34,12 +44,16 @@ export class MQTTPubSub implements PubSubEngine {
       this.mqttConnection.on('error', console.error);
     }
 
+    const clientSubscribeOptions: IClientPublishOptions = {
+      qos: 0,
+    };
+
     this.subscriptionMap = {};
     this.subsRefsMap = {};
     this.currentSubscriptionId = 0;
     this.onMQTTSubscribe = options.onMQTTSubscribe || (() => null);
-    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve({}));
-    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve({}));
+    this.publishOptionsResolver = options.publishOptions || (() => Promise.resolve(clientSubscribeOptions));
+    this.subscribeOptionsResolver = options.subscribeOptions || (() => Promise.resolve(clientSubscribeOptions));
     this.parseMessageWithEncoding = options.parseMessageWithEncoding;
   }
 
@@ -94,8 +108,9 @@ export class MQTTPubSub implements PubSubEngine {
     const [triggerName = null] = this.subscriptionMap[subId] || [];
     const refs = this.subsRefsMap[triggerName];
 
-    if (!refs)
+    if (!refs) {
       throw new Error(`There is no subscription of id "${subId}"`);
+    }
 
     let newRefs;
     if (refs.length === 1) {
@@ -104,7 +119,7 @@ export class MQTTPubSub implements PubSubEngine {
 
     } else {
       const index = refs.indexOf(subId);
-      if (index != -1) {
+      if (index !== -1) {
         newRefs = [...refs.slice(0, index), ...refs.slice(index + 1)];
       }
     }
@@ -121,8 +136,9 @@ export class MQTTPubSub implements PubSubEngine {
     const subscribers = this.subsRefsMap[topic];
 
     // Don't work for nothing..
-    if (!subscribers || !subscribers.length)
+    if (!subscribers || !subscribers.length) {
       return;
+    }
 
     const messageString = message.toString(this.parseMessageWithEncoding);
     let parsedMessage;
@@ -137,17 +153,6 @@ export class MQTTPubSub implements PubSubEngine {
       listener(parsedMessage);
     }
   }
-
-  private triggerTransform: TriggerTransform;
-  private onMQTTSubscribe: SubscribeHandler;
-  private subscribeOptionsResolver: SubscribeOptionsResolver;
-  private publishOptionsResolver: PublishOptionsResolver;
-  private mqttConnection: Client;
-
-  private subscriptionMap: { [subId: number]: [string, Function] };
-  private subsRefsMap: { [trigger: string]: Array<number> };
-  private currentSubscriptionId: number;
-  private parseMessageWithEncoding: string;
 }
 
 export type Path = Array<string | number>;
